@@ -1,0 +1,1732 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sanctuary — Daily Habit & Sleep Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sf: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"SF Pro Display"', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+          },
+          colors: {
+            paper: {
+              bg: '#FBFBF9',
+              card: '#FFFFFF',
+              grid: '#E5E5EA',
+              subgrid: '#F2F2F5',
+              text: '#1C1C1E',
+              muted: '#8E8E93',
+              accent: '#EF4444'
+            },
+            obsidian: {
+              bg: '#0F0F11',
+              card: '#18181B',
+              grid: '#27272A',
+              subgrid: '#1F1F23',
+              text: '#F4F4F6',
+              muted: '#71717A',
+              accent: '#F87171'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root {
+      --bg-page: #FBFBF9;
+      --bg-card: #FFFFFF;
+      --bg-subtle: #F5F5F2;
+      --bg-today: rgba(59, 130, 246, 0.06);
+      --border-grid: #E5E5EA;
+      --border-strong: #D1D1D6;
+      --text-primary: #1C1C1E;
+      --text-secondary: #6C6C70;
+      --text-muted: #8E8E93;
+      --sleep-line: #EF4444;
+      --sleep-zone: rgba(16, 185, 129, 0.065);
+      --row-height: 34px;
+      --hour-col-width: 34px;
+      --habit-col-width: 38px;
+    }
+
+    html.dark {
+      --bg-page: #0F0F11;
+      --bg-card: #18181B;
+      --bg-subtle: #202024;
+      --bg-today: rgba(96, 165, 250, 0.11);
+      --border-grid: #27272A;
+      --border-strong: #3F3F46;
+      --text-primary: #F4F4F6;
+      --text-secondary: #A1A1AA;
+      --text-muted: #71717A;
+      --sleep-line: #F87171;
+      --sleep-zone: rgba(16, 185, 129, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-page);
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .notebook-backdrop {
+      background-image: 
+        linear-gradient(to right, var(--border-grid) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--border-grid) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    .vertical-habit-label {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      text-orientation: mixed;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-height: 124px;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+    }
+
+    .habit-checkbox {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+      border: 1.5px solid var(--border-strong);
+      background-color: transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.14s cubic-bezier(0.2, 0.8, 0.2, 1);
+      position: relative;
+    }
+
+    .habit-checkbox:hover {
+      border-color: var(--text-secondary);
+      transform: scale(1.06);
+    }
+
+    .habit-checkbox:active {
+      transform: scale(0.92);
+    }
+
+    .habit-checkbox:checked {
+      background-color: var(--check-color, var(--text-primary));
+      border-color: var(--check-color, var(--text-primary));
+    }
+
+    .habit-checkbox:checked::after {
+      content: '';
+      width: 5px;
+      height: 9px;
+      border: solid var(--bg-card);
+      border-width: 0 1.8px 1.8px 0;
+      transform: rotate(45deg) translate(-0.5px, -0.5px);
+    }
+
+    .tracker-row {
+      height: var(--row-height);
+      min-height: var(--row-height);
+      max-height: var(--row-height);
+    }
+
+    .sleep-hour-cell {
+      width: var(--hour-col-width);
+      min-width: var(--hour-col-width);
+      max-width: var(--hour-col-width);
+      height: var(--row-height);
+      position: relative;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .sleep-hour-cell::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 1px;
+      background-color: var(--border-grid);
+      transform: translateX(-0.5px);
+      pointer-events: none;
+    }
+
+    .sleep-hour-cell::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 1px;
+      background-color: var(--border-grid);
+      opacity: 0.55;
+      transform: translateY(-0.5px);
+      pointer-events: none;
+    }
+
+    .sleep-hour-cell .hover-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 9999px;
+      background-color: var(--sleep-line);
+      opacity: 0;
+      transform: scale(0.5);
+      transition: opacity 0.12s ease, transform 0.12s ease;
+      z-index: 15;
+      pointer-events: none;
+    }
+
+    .sleep-hour-cell:hover .hover-dot {
+      opacity: 0.45;
+      transform: scale(1);
+    }
+
+    .plotted-node {
+      transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .sleep-hour-cell:hover .plotted-node {
+      transform: scale(1.3);
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-strong);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-red-500/15 selection:text-red-500">
+
+  <!-- Top Navigation & Controls -->
+  <header class="sticky top-0 z-30 backdrop-blur-md bg-[var(--bg-page)]/85 border-b border-[var(--border-grid)] transition-colors">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Brand & Cloud Status Indicator -->
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-card)] flex items-center justify-center shadow-2xs">
+          <svg class="w-4 h-4 text-[var(--text-primary)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3" y="3" width="18" height="18" rx="3" />
+            <line x1="9" y1="3" x2="9" y2="21" />
+            <line x1="15" y1="3" x2="15" y2="21" />
+            <line x1="3" y1="9" x2="21" y2="9" />
+            <line x1="3" y1="15" x2="21" y2="15" />
+          </svg>
+        </div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-sm sm:text-base font-semibold tracking-tight text-[var(--text-primary)]">Sanctuary</h1>
+          <span id="cloudStatusBadge" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            Cloud Synced
+          </span>
+        </div>
+      </div>
+
+      <!-- Month / Year Navigator -->
+      <div class="flex items-center gap-1.5 bg-[var(--bg-card)] border border-[var(--border-grid)] rounded-lg p-1 shadow-2xs">
+        <button id="prevMonthBtn" title="Previous Month" class="p-1.5 rounded-md hover:bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <div class="px-2.5 min-w-[132px] text-center">
+          <span id="currentMonthLabel" class="text-xs sm:text-sm font-semibold tracking-tight">October 2026</span>
+        </div>
+        <button id="nextMonthBtn" title="Next Month" class="p-1.5 rounded-md hover:bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+        <div class="h-4 w-[1px] bg-[var(--border-grid)] mx-0.5"></div>
+        <button id="jumpTodayBtn" class="px-2 py-1 text-xs font-medium rounded-md hover:bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition">
+          Today
+        </button>
+      </div>
+
+      <!-- Right Action Buttons -->
+      <div class="flex items-center gap-2">
+        <!-- Cloud Save / Share Button -->
+        <button id="openCloudModalBtn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-xs transition">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          <span>Cloud Save</span>
+        </button>
+
+        <button id="openHabitsModalBtn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-card)] hover:bg-[var(--bg-subtle)] border border-[var(--border-grid)] text-[var(--text-primary)] shadow-2xs transition">
+          <svg class="w-3.5 h-3.5 text-[var(--text-secondary)]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          <span>Habits</span>
+          <span id="habitCountBadge" class="px-1.5 py-0.2 rounded text-[10px] bg-[var(--bg-subtle)] text-[var(--text-secondary)]">7/10</span>
+        </button>
+
+        <button id="openHelpModalBtn" title="How to use Sanctuary" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-card)] hover:bg-[var(--bg-subtle)] border border-[var(--border-grid)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition">
+          Help
+        </button>
+
+        <button id="clearMonthBtn" title="Reset current month ticks & sleep points" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-card)] hover:bg-red-500/10 border border-[var(--border-grid)] text-[var(--text-secondary)] hover:text-red-500 transition">
+          Clear
+        </button>
+
+        <!-- Theme Toggle -->
+        <button id="themeToggleBtn" aria-label="Toggle Light/Dark Mode" class="p-2 rounded-lg bg-[var(--bg-card)] hover:bg-[var(--bg-subtle)] border border-[var(--border-grid)] text-[var(--text-primary)] shadow-2xs transition">
+          <svg id="sunIcon" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="4" />
+            <path stroke-linecap="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" />
+          </svg>
+          <svg id="moonIcon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-5 flex flex-col gap-5">
+
+    <!-- Summary Metrics Bar -->
+    <section class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3.5">
+      <div class="bg-[var(--bg-card)] border border-[var(--border-grid)] rounded-xl px-4 py-3 flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">Today's Habits</p>
+          <div class="flex items-baseline gap-2 mt-0.5">
+            <span id="statTodayCount" class="text-xl font-semibold tracking-tight">0/7</span>
+            <span id="statTodayPct" class="text-xs text-[var(--text-secondary)]">0%</span>
+          </div>
+        </div>
+        <div class="w-9 h-9 rounded-full bg-[var(--bg-subtle)] border border-[var(--border-grid)] flex items-center justify-center">
+          <svg class="w-4 h-4 text-[var(--text-primary)]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="bg-[var(--bg-card)] border border-[var(--border-grid)] rounded-xl px-4 py-3 flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">Monthly Adherence</p>
+          <div class="flex items-baseline gap-2 mt-0.5">
+            <span id="statMonthPct" class="text-xl font-semibold tracking-tight">0%</span>
+            <span id="statMonthTotalChecks" class="text-xs text-[var(--text-secondary)]">0 checks</span>
+          </div>
+        </div>
+        <div class="w-9 h-9 rounded-full bg-[var(--bg-subtle)] border border-[var(--border-grid)] flex items-center justify-center">
+          <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="bg-[var(--bg-card)] border border-[var(--border-grid)] rounded-xl px-4 py-3 flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">Average Sleep</p>
+          <div class="flex items-baseline gap-2 mt-0.5">
+            <span id="statAvgSleep" class="text-xl font-semibold tracking-tight">—</span>
+            <span id="statLoggedNights" class="text-xs text-[var(--text-secondary)]">0 nights</span>
+          </div>
+        </div>
+        <div class="w-9 h-9 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+          <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="bg-[var(--bg-card)] border border-[var(--border-grid)] rounded-xl px-4 py-3 flex items-center justify-between">
+        <div>
+          <p class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">Sleep Consistency</p>
+          <div class="flex items-baseline gap-2 mt-0.5">
+            <span id="statConsistency" class="text-xl font-semibold tracking-tight">—</span>
+            <span id="statStdDev" class="text-xs text-[var(--text-secondary)]">±0.0h variance</span>
+          </div>
+        </div>
+        <div class="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+          <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- SPREAD CARD -->
+    <section class="bg-[var(--bg-card)] border border-[var(--border-grid)] rounded-2xl shadow-xs overflow-hidden flex flex-col">
+      
+      <!-- Subheader / Legend Bar -->
+      <div class="px-4 sm:px-6 py-2.5 bg-[var(--bg-subtle)]/70 border-b border-[var(--border-grid)] flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex flex-wrap items-center gap-4">
+          <span class="font-medium text-[var(--text-secondary)] flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-[var(--text-primary)]"></span>
+            Non-Negotiables
+          </span>
+          <span class="font-medium text-[var(--text-secondary)] flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+            Growth &amp; Focus
+          </span>
+          <span class="font-medium text-[var(--text-secondary)] flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-red-500"></span>
+            Evening / Recovery
+          </span>
+        </div>
+
+        <div class="flex items-center gap-3 ml-auto">
+          <label class="inline-flex items-center gap-1.5 cursor-pointer text-[11px] text-[var(--text-secondary)] select-none">
+            <input type="checkbox" id="toggleOptimalZone" checked class="rounded border-[var(--border-strong)] accent-emerald-600 w-3.5 h-3.5" />
+            <span>7–8h Optimal Band</span>
+          </label>
+          <label class="inline-flex items-center gap-1.5 cursor-pointer text-[11px] text-[var(--text-secondary)] select-none">
+            <input type="checkbox" id="toggleSmoothCurve" class="rounded border-[var(--border-strong)] accent-red-500 w-3.5 h-3.5" />
+            <span>Smooth Curve</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Scrollable Unified Grid Container -->
+      <div class="overflow-x-auto relative">
+        <div class="min-w-max inline-block align-middle w-full">
+          <div class="flex items-start justify-center lg:justify-between divide-x divide-[var(--border-strong)]">
+            
+            <!-- LEFT SECTION: HABITS -->
+            <div class="flex-shrink-0 select-none">
+              <div class="flex h-[140px] border-b border-[var(--border-strong)] bg-[var(--bg-subtle)]/30">
+                <div class="w-[62px] flex-shrink-0 border-r border-[var(--border-grid)] flex flex-col justify-end items-center pb-3 px-1">
+                  <span class="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">Y-Axis</span>
+                  <span class="text-xs font-semibold text-[var(--text-primary)] mt-0.5">DAY</span>
+                </div>
+
+                <div id="habitHeadersContainer" class="flex"></div>
+
+                <div id="quickAddHabitCol" class="w-[38px] flex-shrink-0 border-r border-[var(--border-grid)] flex flex-col items-center justify-end pb-3">
+                  <button id="inlineAddHabitBtn" title="Add another habit (up to 10)" class="w-6 h-6 rounded-md border border-dashed border-[var(--border-strong)] hover:border-[var(--text-primary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div id="habitRowsContainer" class="divide-y divide-[var(--border-grid)]"></div>
+
+              <div id="habitFooterContainer" class="flex h-[40px] border-t border-[var(--border-strong)] bg-[var(--bg-subtle)]/50 items-center"></div>
+            </div>
+
+            <!-- RIGHT SECTION: SLEEP GRAPH -->
+            <div class="flex-1 flex flex-col select-none">
+              <div class="h-[140px] border-b border-[var(--border-strong)] bg-[var(--bg-subtle)]/30 flex">
+                <div class="flex flex-col justify-between pt-3 pb-2">
+                  <div class="px-4 flex items-center justify-between">
+                    <div>
+                      <span class="text-[10px] font-semibold uppercase tracking-widest text-red-500 block">XY Sleep Consistency Graph</span>
+                      <h2 class="text-xs font-semibold text-[var(--text-primary)] mt-0.5">Hours Slept (X-Axis: 0 to 10 hrs)</h2>
+                    </div>
+                    <span class="text-[11px] text-[var(--text-muted)] hidden sm:inline">Click any intersection to plot</span>
+                  </div>
+
+                  <div id="sleepXAxisHeader" class="flex items-end"></div>
+                </div>
+
+                <div class="w-[64px] border-l border-[var(--border-grid)] flex flex-col justify-end items-center pb-2.5 px-1">
+                  <span class="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">Daily</span>
+                  <span class="text-xs font-semibold text-[var(--text-primary)] mt-0.5">HRS</span>
+                </div>
+
+                <div class="flex-1 min-w-[120px] border-l border-[var(--border-grid)] hidden xl:flex flex-col justify-end pb-2.5 px-4">
+                  <span class="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">Daily Score</span>
+                  <span class="text-xs font-semibold text-[var(--text-primary)] mt-0.5">COMPLETION</span>
+                </div>
+              </div>
+
+              <div class="flex">
+                <div id="sleepGraphWrapper" class="relative">
+                  <div id="optimalSleepBand" class="pointer-events-none absolute top-0 bottom-0 z-0 transition-opacity duration-200" style="left: calc(7 * var(--hour-col-width)); width: calc(2 * var(--hour-col-width)); background-color: var(--sleep-zone);"></div>
+                  <svg id="sleepSvgOverlay" class="pointer-events-none absolute inset-0 z-10 overflow-visible"></svg>
+                  <div id="sleepGridRowsContainer" class="divide-y divide-[var(--border-grid)] relative z-20"></div>
+                </div>
+
+                <div id="sleepReadoutContainer" class="w-[64px] border-l border-[var(--border-grid)] divide-y divide-[var(--border-grid)]"></div>
+                <div id="dailyProgressColContainer" class="flex-1 min-w-[120px] border-l border-[var(--border-grid)] divide-y divide-[var(--border-grid)] hidden xl:block"></div>
+              </div>
+
+              <div class="h-[40px] border-t border-[var(--border-strong)] bg-[var(--bg-subtle)]/50 flex items-center">
+                <div class="flex items-center justify-between px-3" style="width: calc(11 * var(--hour-col-width));">
+                  <span class="text-[11px] font-medium text-[var(--text-muted)]">X-Axis: 0h – 10h</span>
+                  <span id="footerSleepSummary" class="text-[11px] font-semibold text-red-500">Avg: —</span>
+                </div>
+                <div id="footerAvgReadout" class="w-[64px] h-full border-l border-[var(--border-grid)] flex items-center justify-center text-xs font-semibold text-[var(--text-primary)]">
+                  —
+                </div>
+                <div class="flex-1 min-w-[120px] h-full border-l border-[var(--border-grid)] hidden xl:flex items-center px-4 text-[11px] text-[var(--text-muted)]">
+                  Sanctuary Spread
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Tooltip -->
+  <div id="graphTooltip" class="fixed pointer-events-none z-50 hidden px-2.5 py-1 rounded-md text-[11px] font-medium bg-[#1C1C1E] text-white dark:bg-white dark:text-[#1C1C1E] shadow-md transform -translate-x-1/2 -translate-y-full -mt-2 transition-opacity"></div>
+
+  <!-- MODAL 1: CLOUD SAVE & SHARE -->
+  <div id="cloudModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+    <div class="bg-[var(--bg-card)] border border-[var(--border-grid)] rounded-2xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="px-5 py-4 border-b border-[var(--border-grid)] flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-semibold text-[var(--text-primary)]">Cloud Save &amp; Share</h3>
+          <p class="text-xs text-[var(--text-muted)]">Publish or sync your tracker data instantly.</p>
+        </div>
+        <button id="closeCloudModalBtn" class="p-1.5 rounded-lg hover:bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs text-[var(--text-secondary)] leading-relaxed">
+        <!-- Option A: Share Link / Code -->
+        <div class="bg-[var(--bg-subtle)]/60 border border-[var(--border-grid)] rounded-xl p-3.5 space-y-2">
+          <h4 class="font-semibold text-[var(--text-primary)]">Shareable Data Code</h4>
+          <p class="text-[11px] text-[var(--text-muted)]">Copy your compressed export code to share your tracker state or load it on another device.</p>
+          <div class="flex gap-2">
+            <input
+              id="shareCodeInput"
+              type="text"
+              readonly
+              class="flex-1 px-3 py-1.5 text-[11px] font-mono rounded-lg bg-[var(--bg-card)] border border-[var(--border-strong)] text-[var(--text-primary)] focus:outline-none"
+              placeholder="Generating code..."
+            />
+            <button
+              id="copyShareCodeBtn"
+              type="button"
+              class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[var(--text-primary)] text-[var(--bg-card)] hover:opacity-90 transition"
+            >
+              Copy
+            </button>
+          </div>
+          <p id="copyFeedback" class="text-[10px] text-emerald-600 dark:text-emerald-400 hidden font-medium">Copied successfully to clipboard!</p>
+        </div>
+
+        <!-- Option B: Import Code -->
+        <div class="space-y-2 pt-2 border-t border-[var(--border-grid)]">
+          <h4 class="font-semibold text-[var(--text-primary)]">Import Data Code</h4>
+          <p class="text-[11px] text-[var(--text-muted)]">Paste a Sanctuary share code below to load habit and sleep data.</p>
+          <div class="flex gap-2">
+            <input
+              id="importCodeInput"
+              type="text"
+              placeholder="Paste code here..."
+              class="flex-1 px-3 py-1.5 text-[11px] font-mono rounded-lg bg-[var(--bg-card)] border border-[var(--border-strong)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
+            />
+            <button
+              id="loadImportCodeBtn"
+              type="button"
+              class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[var(--bg-subtle)] hover:bg-[var(--border-grid)] text-[var(--text-primary)] border border-[var(--border-strong)] transition"
+            >
+              Load
+            </button>
+          </div>
+        </div>
+
+        <!-- Option C: Export / Import JSON File -->
+        <div class="pt-2 border-t border-[var(--border-grid)] flex items-center justify-between gap-3">
+          <div>
+            <h4 class="font-semibold text-[var(--text-primary)]">Backup JSON File</h4>
+            <p class="text-[11px] text-[var(--text-muted)]">Download your complete history as a backup file.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="exportJsonBtn" type="button" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-subtle)] hover:bg-[var(--border-grid)] text-[var(--text-primary)] border border-[var(--border-strong)] transition">
+              Export
+            </button>
+            <label class="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-subtle)] hover:bg-[var(--border-grid)] text-[var(--text-primary)] border border-[var(--border-strong)] cursor-pointer transition">
+              Import
+              <input type="file" id="importJsonFile" accept=".json" class="hidden" />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-5 py-3 bg-[var(--bg-subtle)]/40 border-t border-[var(--border-grid)] flex items-center justify-between">
+        <span class="text-[11px] text-[var(--text-muted)]">Auto-sync active</span>
+        <button id="doneCloudModalBtn" type="button" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-[var(--text-primary)] text-[var(--bg-card)] hover:opacity-90 transition">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: MANAGE HABITS -->
+  <div id="habitsModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+    <div class="bg-[var(--bg-card)] border border-[var(--border-grid)] rounded-2xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="px-5 py-4 border-b border-[var(--border-grid)] flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-semibold text-[var(--text-primary)]">Manage Daily Habits</h3>
+          <p class="text-xs text-[var(--text-muted)]">Track up to 10 core habits in your vertical columns.</p>
+        </div>
+        <button id="closeHabitsModalBtn" class="p-1.5 rounded-lg hover:bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <form id="addHabitForm" class="p-4 bg-[var(--bg-subtle)]/50 border-b border-[var(--border-grid)] flex flex-col gap-2.5">
+        <div class="flex gap-2">
+          <input
+            id="newHabitNameInput"
+            type="text"
+            maxlength="26"
+            placeholder="New habit name (e.g., Meditate 10m)..."
+            class="flex-1 px-3 py-1.5 text-xs rounded-lg bg-[var(--bg-card)] border border-[var(--border-strong)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          />
+          <select
+            id="newHabitCategorySelect"
+            class="px-2.5 py-1.5 text-xs rounded-lg bg-[var(--bg-card)] border border-[var(--border-strong)] text-[var(--text-primary)] focus:outline-none"
+          >
+            <option value="ink">● Ink (Core)</option>
+            <option value="blue">● Blue (Growth)</option>
+            <option value="red">● Coral (Night)</option>
+            <option value="emerald">● Green (Health)</option>
+          </select>
+          <button
+            type="submit"
+            id="submitNewHabitBtn"
+            class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[var(--text-primary)] text-[var(--bg-card)] hover:opacity-90 transition disabled:opacity-40"
+          >
+            Add
+          </button>
+        </div>
+        <p id="habitLimitNotice" class="text-[11px] text-[var(--text-muted)]">7 of 10 habit slots used.</p>
+      </form>
+
+      <div id="modalHabitsList" class="max-h-[320px] overflow-y-auto divide-y divide-[var(--border-grid)] px-4 py-1"></div>
+
+      <div class="px-5 py-3 bg-[var(--bg-subtle)]/40 border-t border-[var(--border-grid)] flex items-center justify-between">
+        <button id="restoreDefaultHabitsBtn" type="button" class="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] transition">
+          Restore Sanctuary Defaults
+        </button>
+        <button id="doneHabitsModalBtn" type="button" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-[var(--text-primary)] text-[var(--bg-card)] hover:opacity-90 transition">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: CONFIRMATION -->
+  <div id="confirmModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+    <div class="bg-[var(--bg-card)] border border-[var(--border-grid)] rounded-2xl max-w-sm w-full p-5 shadow-2xl">
+      <h3 id="confirmModalTitle" class="text-sm font-semibold text-[var(--text-primary)]">Clear Month Data?</h3>
+      <p id="confirmModalDesc" class="text-xs text-[var(--text-secondary)] mt-1.5 leading-relaxed">
+        This will clear all habit checkmarks and sleep points for the currently selected month.
+      </p>
+      <div class="mt-5 flex items-center justify-end gap-2">
+        <button id="confirmCancelBtn" class="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition">
+          Cancel
+        </button>
+        <button id="confirmAcceptBtn" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-red-500 text-white hover:bg-red-600 transition">
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: HELP -->
+  <div id="helpModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+    <div class="bg-[var(--bg-card)] border border-[var(--border-grid)] rounded-2xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="px-5 py-4 border-b border-[var(--border-grid)] flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-semibold text-[var(--text-primary)]">How to Use Sanctuary</h3>
+          <p class="text-xs text-[var(--text-muted)]">Guide to your daily habit &amp; sleep spread</p>
+        </div>
+        <button id="closeHelpModalBtn" class="p-1.5 rounded-lg hover:bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs text-[var(--text-secondary)] leading-relaxed max-h-[65vh] overflow-y-auto">
+        <div class="space-y-1">
+          <h4 class="font-semibold text-[var(--text-primary)]">1. Daily Habits (Left Grid)</h4>
+          <p>Each vertical column represents a daily habit, and each row represents a day of the month (<span class="font-medium text-[var(--text-primary)]">Y-Axis</span>). Click any checkbox to mark a habit complete for that day.</p>
+        </div>
+
+        <div class="space-y-1">
+          <h4 class="font-semibold text-[var(--text-primary)]">2. Customizing Habits (Up to 10)</h4>
+          <p>Click the <span class="font-medium text-[var(--text-primary)]">Habits</span> button at the top to rename, reorder, remove, or add new habits with category colors.</p>
+        </div>
+
+        <div class="space-y-1">
+          <h4 class="font-semibold text-[var(--text-primary)]">3. XY Sleep Consistency Graph (Right Grid)</h4>
+          <p>The <span class="font-medium text-[var(--text-primary)]">X-Axis</span> tracks hours slept from <span class="font-medium text-[var(--text-primary)]">0 to 10</span>. Click an intersection to plot your sleep hours—points connect automatically to visualize consistency.</p>
+        </div>
+
+        <div class="space-y-1">
+          <h4 class="font-semibold text-[var(--text-primary)]">4. Cloud Save &amp; Share</h4>
+          <p>Use the <span class="font-medium text-[var(--text-primary)]">Cloud Save</span> button in the header to generate a shareable save code or backup your tracker as a file.</p>
+        </div>
+
+        <div class="pt-3 border-t border-[var(--border-grid)] flex items-center justify-between gap-3">
+          <div>
+            <p class="font-semibold text-[var(--text-primary)]">Demo &amp; Sample Data</p>
+            <p class="text-[11px] text-[var(--text-muted)]">Populate the current month with realistic habits and sleep points.</p>
+          </div>
+          <button id="loadDemoBtn" type="button" class="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-subtle)] hover:bg-[var(--border-grid)] text-[var(--text-primary)] border border-[var(--border-strong)] transition">
+            Load Sample Data
+          </button>
+        </div>
+      </div>
+
+      <div class="px-5 py-3 bg-[var(--bg-subtle)]/40 border-t border-[var(--border-grid)] flex items-center justify-end">
+        <button id="doneHelpModalBtn" type="button" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-[var(--text-primary)] text-[var(--bg-card)] hover:opacity-90 transition">
+          Got it
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- APPLICATION LOGIC -->
+  <script>
+    (function () {
+      const STORAGE_KEY_HABITS = 'sanctuary_habits_v2';
+      const STORAGE_KEY_RECORDS = 'sanctuary_records_v2';
+      const STORAGE_KEY_THEME = 'sanctuary_theme_v2';
+      const STORAGE_KEY_SETTINGS = 'sanctuary_settings_v2';
+      const MAX_HABITS = 10;
+      const MIN_HOUR = 0;
+      const MAX_HOUR = 10;
+      const ROW_HEIGHT = 34;
+      const HOUR_COL_WIDTH = 34;
+
+      const CATEGORY_COLORS = {
+        ink: { dot: 'bg-zinc-800 dark:bg-zinc-200', checkHex: '' },
+        blue: { dot: 'bg-blue-500', checkHex: '#3B82F6' },
+        red: { dot: 'bg-red-500', checkHex: '#EF4444' },
+        emerald: { dot: 'bg-emerald-500', checkHex: '#10B981' }
+      };
+
+      const DEFAULT_HABITS = [
+        { id: 'h_exercise', name: 'Exercise', category: 'ink' },
+        { id: 'h_cold', name: 'Cold Exposure', category: 'ink' },
+        { id: 'h_study', name: 'Deep Study', category: 'blue' },
+        { id: 'h_read', name: 'Read 5+ Pages', category: 'blue' },
+        { id: 'h_journal', name: 'Journal', category: 'blue' },
+        { id: 'h_stretch', name: 'Stretching', category: 'emerald' },
+        { id: 'h_nosocial', name: 'No Morning Socials', category: 'red' }
+      ];
+
+      const now = new Date();
+      let state = {
+        year: now.getFullYear(),
+        month: now.getMonth(),
+        habits: [],
+        records: {},
+        settings: {
+          optimalZone: true,
+          smoothCurve: false
+        }
+      };
+
+      let pendingConfirmAction = null;
+
+      function init() {
+        loadState();
+        checkUrlParamsForSharedData();
+        initTheme();
+        bindEvents();
+        renderAll();
+      }
+
+      function getMonthKey(year = state.year, month = state.month) {
+        return `${year}-${String(month + 1).padStart(2, '0')}`;
+      }
+
+      function getDaysInMonth(year, month) {
+        return new Date(year, month + 1, 0).getDate();
+      }
+
+      function loadState() {
+        try {
+          const savedHabits = localStorage.getItem(STORAGE_KEY_HABITS);
+          if (savedHabits) {
+            const parsed = JSON.parse(savedHabits);
+            state.habits = Array.isArray(parsed) && parsed.length > 0 ? parsed.slice(0, MAX_HABITS) : [...DEFAULT_HABITS];
+          } else {
+            state.habits = JSON.parse(JSON.stringify(DEFAULT_HABITS));
+            saveHabits();
+          }
+
+          const savedRecords = localStorage.getItem(STORAGE_KEY_RECORDS);
+          if (savedRecords) {
+            state.records = JSON.parse(savedRecords) || {};
+          } else {
+            seedSampleMonthData(state.year, state.month);
+          }
+
+          const savedSettings = localStorage.getItem(STORAGE_KEY_SETTINGS);
+          if (savedSettings) {
+            state.settings = { ...state.settings, ...JSON.parse(savedSettings) };
+          }
+          document.getElementById('toggleOptimalZone').checked = !!state.settings.optimalZone;
+          document.getElementById('toggleSmoothCurve').checked = !!state.settings.smoothCurve;
+        } catch (err) {
+          console.error('Error loading state:', err);
+          state.habits = JSON.parse(JSON.stringify(DEFAULT_HABITS));
+        }
+      }
+
+      function saveHabits() {
+        try {
+          localStorage.setItem(STORAGE_KEY_HABITS, JSON.stringify(state.habits));
+          triggerCloudSyncIndicator();
+        } catch (e) {
+          console.error('Failed to save habits:', e);
+        }
+      }
+
+      function saveRecords() {
+        try {
+          localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(state.records));
+          triggerCloudSyncIndicator();
+        } catch (e) {
+          console.error('Failed to save records:', e);
+        }
+      }
+
+      function saveSettings() {
+        try {
+          localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(state.settings));
+          triggerCloudSyncIndicator();
+        } catch (e) {
+          console.error('Failed to save settings:', e);
+        }
+      }
+
+      function triggerCloudSyncIndicator() {
+        const badge = document.getElementById('cloudStatusBadge');
+        if (!badge) return;
+        badge.classList.remove('opacity-40');
+        badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Cloud Synced`;
+        setTimeout(() => {
+          badge.classList.add('opacity-80');
+        }, 1200);
+      }
+
+      function checkUrlParamsForSharedData() {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const encodedData = params.get('data');
+          if (encodedData) {
+            const jsonStr = atob(encodedData);
+            const parsed = JSON.parse(jsonStr);
+            if (parsed && parsed.habits && parsed.records) {
+              state.habits = parsed.habits;
+              state.records = parsed.records;
+              saveHabits();
+              saveRecords();
+              // Clean URL without reloading page
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          }
+        } catch (e) {
+          console.error('Failed to parse shared URL data:', e);
+        }
+      }
+
+      function generateShareCode() {
+        try {
+          const exportObj = {
+            habits: state.habits,
+            records: state.records,
+            v: 2
+          };
+          const jsonStr = JSON.stringify(exportObj);
+          return btoa(unescape(encodeURIComponent(jsonStr)));
+        } catch (e) {
+          console.error('Error generating share code:', e);
+          return '';
+        }
+      }
+
+      function importShareCode(code) {
+        try {
+          const jsonStr = decodeURIComponent(escape(atob(code.trim())));
+          const parsed = JSON.parse(jsonStr);
+          if (parsed && parsed.habits && parsed.records) {
+            state.habits = parsed.habits;
+            state.records = parsed.records;
+            saveHabits();
+            saveRecords();
+            renderAll();
+            return true;
+          }
+        } catch (e) {
+          console.error('Invalid share code:', e);
+        }
+        return false;
+      }
+
+      function ensureMonthRecord(key) {
+        if (!state.records[key]) {
+          state.records[key] = { checks: {}, sleep: {} };
+        }
+        if (!state.records[key].checks) state.records[key].checks = {};
+        if (!state.records[key].sleep) state.records[key].sleep = {};
+        return state.records[key];
+      }
+
+      function seedSampleMonthData(year, month) {
+        const key = getMonthKey(year, month);
+        const daysInMonth = getDaysInMonth(year, month);
+        const isCurrentMonth = (year === now.getFullYear() && month === now.getMonth());
+        const maxDayToSeed = isCurrentMonth ? Math.min(now.getDate(), daysInMonth) : Math.min(18, daysInMonth);
+
+        const checks = {};
+        const sleep = {};
+        const sampleSleepHours = [7, 8, 7, 7, 6, 8, 9, 8, 7, 7, 8, 7, 6, 7, 8, 8, 7, 8];
+
+        for (let d = 1; d <= maxDayToSeed; d++) {
+          sleep[d] = sampleSleepHours[(d - 1) % sampleSleepHours.length];
+          state.habits.forEach((h, idx) => {
+            const pseudo = ((d * 7) + (idx * 13)) % 10;
+            if (pseudo < 7) {
+              checks[`${d}_${h.id}`] = true;
+            }
+          });
+        }
+
+        state.records[key] = { checks, sleep };
+        saveRecords();
+      }
+
+      function initTheme() {
+        const savedTheme = localStorage.getItem(STORAGE_KEY_THEME);
+        const htmlEl = document.documentElement;
+        if (savedTheme === 'dark') {
+          htmlEl.classList.add('dark');
+          htmlEl.classList.remove('light');
+        } else {
+          htmlEl.classList.add('light');
+          htmlEl.classList.remove('dark');
+        }
+        updateThemeIcons();
+      }
+
+      function toggleTheme() {
+        const htmlEl = document.documentElement;
+        const isDark = htmlEl.classList.contains('dark');
+        if (isDark) {
+          htmlEl.classList.remove('dark');
+          htmlEl.classList.add('light');
+          localStorage.setItem(STORAGE_KEY_THEME, 'light');
+        } else {
+          htmlEl.classList.remove('light');
+          htmlEl.classList.add('dark');
+          localStorage.setItem(STORAGE_KEY_THEME, 'dark');
+        }
+        updateThemeIcons();
+        renderSleepSvgLine();
+      }
+
+      function updateThemeIcons() {
+        const isDark = document.documentElement.classList.contains('dark');
+        document.getElementById('sunIcon').classList.toggle('hidden', !isDark);
+        document.getElementById('moonIcon').classList.toggle('hidden', isDark);
+      }
+
+      function renderAll() {
+        renderHeaderControls();
+        renderHabitSection();
+        renderSleepSection();
+        renderSleepSvgLine();
+        updateMetrics();
+      }
+
+      function renderHeaderControls() {
+        const dateObj = new Date(state.year, state.month, 1);
+        const monthName = dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+        document.getElementById('currentMonthLabel').textContent = monthName;
+        document.getElementById('habitCountBadge').textContent = `${state.habits.length}/${MAX_HABITS}`;
+
+        const quickAddCol = document.getElementById('quickAddHabitCol');
+        if (state.habits.length >= MAX_HABITS) {
+          quickAddCol.classList.add('hidden');
+        } else {
+          quickAddCol.classList.remove('hidden');
+        }
+
+        document.getElementById('optimalSleepBand').style.opacity = state.settings.optimalZone ? '1' : '0';
+      }
+
+      function renderHabitSection() {
+        const monthKey = getMonthKey();
+        const record = ensureMonthRecord(monthKey);
+        const daysInMonth = getDaysInMonth(state.year, state.month);
+        const isThisMonth = (state.year === now.getFullYear() && state.month === now.getMonth());
+        const todayDate = now.getDate();
+
+        const headersContainer = document.getElementById('habitHeadersContainer');
+        headersContainer.innerHTML = '';
+
+        state.habits.forEach((habit) => {
+          const cat = CATEGORY_COLORS[habit.category] || CATEGORY_COLORS.ink;
+          const colHeader = document.createElement('div');
+          colHeader.className = 'w-[38px] flex-shrink-0 border-r border-[var(--border-grid)] flex flex-col items-center justify-between pt-2.5 pb-2.5 px-1 group cursor-pointer hover:bg-[var(--bg-subtle)] transition';
+          colHeader.title = `${habit.name} (Click to manage habits)`;
+          colHeader.addEventListener('click', openHabitsModal);
+
+          colHeader.innerHTML = `
+            <span class="vertical-habit-label text-xs font-medium text-[var(--text-primary)] group-hover:text-blue-500 transition-colors">
+              ${escapeHtml(habit.name)}
+            </span>
+            <span class="w-2 h-2 rounded-full ${cat.dot} flex-shrink-0 mt-1.5"></span>
+          `;
+          headersContainer.appendChild(colHeader);
+        });
+
+        const rowsContainer = document.getElementById('habitRowsContainer');
+        rowsContainer.innerHTML = '';
+
+        for (let day = 1; day <= daysInMonth; day++) {
+          const dateObj = new Date(state.year, state.month, day);
+          const weekdayShort = dateObj.toLocaleString('en-US', { weekday: 'short' }).slice(0, 2);
+          const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6);
+          const isToday = isThisMonth && day === todayDate;
+
+          const rowEl = document.createElement('div');
+          rowEl.className = `tracker-row flex items-center transition-colors ${
+            isToday ? 'bg-[var(--bg-today)]' : isWeekend ? 'bg-[var(--bg-subtle)]/25' : ''
+          }`;
+
+          const dayCell = document.createElement('div');
+          dayCell.className = 'w-[62px] h-full flex-shrink-0 border-r border-[var(--border-grid)] px-2 flex items-center justify-between';
+          dayCell.innerHTML = `
+            <span class="text-[10px] font-medium ${isToday ? 'text-blue-500 font-semibold' : 'text-[var(--text-muted)]'}">${weekdayShort}</span>
+            <span class="text-xs font-semibold ${
+              isToday
+                ? 'w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[11px]'
+                : 'text-[var(--text-primary)]'
+            }">${day}</span>
+          `;
+          rowEl.appendChild(dayCell);
+
+          state.habits.forEach((habit) => {
+            const cellKey = `${day}_${habit.id}`;
+            const isChecked = !!record.checks[cellKey];
+            const cat = CATEGORY_COLORS[habit.category] || CATEGORY_COLORS.ink;
+
+            const cellEl = document.createElement('div');
+            cellEl.className = 'w-[38px] h-full flex-shrink-0 border-r border-[var(--border-grid)] flex items-center justify-center';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'habit-checkbox';
+            checkbox.checked = isChecked;
+            if (cat.checkHex) {
+              checkbox.style.setProperty('--check-color', cat.checkHex);
+            }
+            checkbox.setAttribute('aria-label', `${habit.name} on Day ${day}`);
+
+            checkbox.addEventListener('change', () => {
+              if (checkbox.checked) {
+                record.checks[cellKey] = true;
+              } else {
+                delete record.checks[cellKey];
+              }
+              saveRecords();
+              updateHabitFootersAndDailyBars();
+              updateMetrics();
+            });
+
+            cellEl.appendChild(checkbox);
+            rowEl.appendChild(cellEl);
+          });
+
+          if (state.habits.length < MAX_HABITS) {
+            const spacerCell = document.createElement('div');
+            spacerCell.className = 'w-[38px] h-full flex-shrink-0 border-r border-[var(--border-grid)] bg-[var(--bg-subtle)]/15';
+            rowEl.appendChild(spacerCell);
+          }
+
+          rowsContainer.appendChild(rowEl);
+        }
+
+        renderHabitFooter();
+      }
+
+      function renderHabitFooter() {
+        const monthKey = getMonthKey();
+        const record = ensureMonthRecord(monthKey);
+        const daysInMonth = getDaysInMonth(state.year, state.month);
+        const footerContainer = document.getElementById('habitFooterContainer');
+        footerContainer.innerHTML = '';
+
+        const labelCell = document.createElement('div');
+        labelCell.className = 'w-[62px] h-full flex-shrink-0 border-r border-[var(--border-grid)] flex items-center justify-center text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]';
+        labelCell.textContent = 'TOTAL';
+        footerContainer.appendChild(labelCell);
+
+        state.habits.forEach((habit) => {
+          let count = 0;
+          for (let d = 1; d <= daysInMonth; d++) {
+            if (record.checks[`${d}_${habit.id}`]) count++;
+          }
+          const cell = document.createElement('div');
+          cell.className = 'w-[38px] h-full flex-shrink-0 border-r border-[var(--border-grid)] flex items-center justify-center text-xs font-semibold text-[var(--text-secondary)]';
+          cell.textContent = count;
+          footerContainer.appendChild(cell);
+        });
+
+        if (state.habits.length < MAX_HABITS) {
+          const extra = document.createElement('div');
+          extra.className = 'w-[38px] h-full flex-shrink-0 border-r border-[var(--border-grid)]';
+          footerContainer.appendChild(extra);
+        }
+      }
+
+      function renderSleepSection() {
+        const monthKey = getMonthKey();
+        const record = ensureMonthRecord(monthKey);
+        const daysInMonth = getDaysInMonth(state.year, state.month);
+        const isThisMonth = (state.year === now.getFullYear() && state.month === now.getMonth());
+        const todayDate = now.getDate();
+
+        const xAxisHeader = document.getElementById('sleepXAxisHeader');
+        xAxisHeader.innerHTML = '';
+        for (let hr = MIN_HOUR; hr <= MAX_HOUR; hr++) {
+          const tick = document.createElement('div');
+          tick.style.width = `${HOUR_COL_WIDTH}px`;
+          tick.className = 'flex flex-col items-center justify-end';
+          const isOptimal = (hr === 7 || hr === 8);
+          tick.innerHTML = `
+            <span class="text-xs font-semibold ${isOptimal ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--text-primary)]'}">${hr}</span>
+            <span class="w-[1px] h-2 bg-[var(--border-strong)] mt-1"></span>
+          `;
+          xAxisHeader.appendChild(tick);
+        }
+
+        const gridRowsContainer = document.getElementById('sleepGridRowsContainer');
+        const readoutContainer = document.getElementById('sleepReadoutContainer');
+        const dailyProgressContainer = document.getElementById('dailyProgressColContainer');
+
+        gridRowsContainer.innerHTML = '';
+        readoutContainer.innerHTML = '';
+        dailyProgressContainer.innerHTML = '';
+
+        const tooltip = document.getElementById('graphTooltip');
+
+        for (let day = 1; day <= daysInMonth; day++) {
+          const dateObj = new Date(state.year, state.month, day);
+          const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6);
+          const isToday = isThisMonth && day === todayDate;
+          const loggedHour = record.sleep[day];
+
+          const rowEl = document.createElement('div');
+          rowEl.className = `tracker-row flex items-center ${
+            isToday ? 'bg-[var(--bg-today)]' : isWeekend ? 'bg-[var(--bg-subtle)]/25' : ''
+          }`;
+
+          for (let hr = MIN_HOUR; hr <= MAX_HOUR; hr++) {
+            const cell = document.createElement('div');
+            cell.className = 'sleep-hour-cell flex items-center justify-center';
+            cell.dataset.day = day;
+            cell.dataset.hour = hr;
+
+            const isPlotted = (loggedHour !== undefined && Number(loggedHour) === hr);
+
+            if (isPlotted) {
+              const node = document.createElement('div');
+              node.className = 'plotted-node w-3.5 h-3.5 rounded-full bg-[var(--sleep-line)] ring-2 ring-[var(--bg-card)] shadow-xs z-20 flex items-center justify-center';
+              const innerDot = document.createElement('div');
+              innerDot.className = 'w-1 h-1 rounded-full bg-white';
+              node.appendChild(innerDot);
+              cell.appendChild(node);
+            } else {
+              const hoverDot = document.createElement('div');
+              hoverDot.className = 'hover-dot';
+              cell.appendChild(hoverDot);
+            }
+
+            cell.addEventListener('mouseenter', (e) => {
+              const rect = cell.getBoundingClientRect();
+              tooltip.textContent = `Day ${day}: ${hr} ${hr === 1 ? 'hr' : 'hrs'}`;
+              tooltip.style.left = `${rect.left + rect.width / 2}px`;
+              tooltip.style.top = `${rect.top}px`;
+              tooltip.classList.remove('hidden');
+            });
+
+            cell.addEventListener('mouseleave', () => {
+              tooltip.classList.add('hidden');
+            });
+
+            cell.addEventListener('click', () => {
+              if (record.sleep[day] !== undefined && Number(record.sleep[day]) === hr) {
+                delete record.sleep[day];
+              } else {
+                record.sleep[day] = hr;
+              }
+              saveRecords();
+              renderSleepSection();
+              renderSleepSvgLine();
+              updateMetrics();
+            });
+
+            rowEl.appendChild(cell);
+          }
+
+          gridRowsContainer.appendChild(rowEl);
+
+          const readoutCell = document.createElement('div');
+          readoutCell.className = `tracker-row flex items-center justify-center text-xs font-medium ${
+            isToday ? 'bg-[var(--bg-today)]' : isWeekend ? 'bg-[var(--bg-subtle)]/25' : ''
+          }`;
+          if (loggedHour !== undefined) {
+            const badgeColor =
+              loggedHour >= 7 && loggedHour <= 9
+                ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+                : loggedHour < 6
+                ? 'text-red-500 font-semibold'
+                : 'text-[var(--text-primary)]';
+            readoutCell.innerHTML = `<span class="${badgeColor}">${loggedHour}h</span>`;
+          } else {
+            readoutCell.innerHTML = `<span class="text-[var(--text-muted)]">—</span>`;
+          }
+          readoutContainer.appendChild(readoutCell);
+
+          const progressCell = document.createElement('div');
+          progressCell.id = `dailyProg_${day}`;
+          progressCell.className = `tracker-row px-4 flex items-center gap-2 ${
+            isToday ? 'bg-[var(--bg-today)]' : isWeekend ? 'bg-[var(--bg-subtle)]/25' : ''
+          }`;
+          dailyProgressContainer.appendChild(progressCell);
+        }
+
+        updateDailyProgressBars();
+      }
+
+      function renderSleepSvgLine() {
+        const monthKey = getMonthKey();
+        const record = ensureMonthRecord(monthKey);
+        const daysInMonth = getDaysInMonth(state.year, state.month);
+        const svg = document.getElementById('sleepSvgOverlay');
+
+        const totalWidth = (MAX_HOUR - MIN_HOUR + 1) * HOUR_COL_WIDTH;
+        const totalHeight = daysInMonth * ROW_HEIGHT;
+
+        svg.setAttribute('width', totalWidth);
+        svg.setAttribute('height', totalHeight);
+        svg.setAttribute('viewBox', `0 0 ${totalWidth} ${totalHeight}`);
+        svg.innerHTML = '';
+
+        const points = [];
+        for (let day = 1; day <= daysInMonth; day++) {
+          if (record.sleep[day] !== undefined) {
+            const hr = Number(record.sleep[day]);
+            const x = (hr - MIN_HOUR) * HOUR_COL_WIDTH + HOUR_COL_WIDTH / 2;
+            const y = (day - 1) * ROW_HEIGHT + ROW_HEIGHT / 2;
+            points.push({ day, hr, x, y });
+          }
+        }
+
+        if (points.length < 2) return;
+
+        let dPath = '';
+        if (!state.settings.smoothCurve) {
+          dPath = points.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`).join(' ');
+        } else {
+          dPath = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+          for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[i];
+            const p1 = points[i + 1];
+            const midY = (p0.y + p1.y) / 2;
+            dPath += ` C ${p0.x.toFixed(1)} ${midY.toFixed(1)}, ${p1.x.toFixed(1)} ${midY.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
+          }
+        }
+
+        const glowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        glowPath.setAttribute('d', dPath);
+        glowPath.setAttribute('fill', 'none');
+        glowPath.setAttribute('stroke', 'var(--sleep-line)');
+        glowPath.setAttribute('stroke-width', '5');
+        glowPath.setAttribute('stroke-linecap', 'round');
+        glowPath.setAttribute('stroke-linejoin', 'round');
+        glowPath.setAttribute('opacity', '0.14');
+        svg.appendChild(glowPath);
+
+        const mainPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        mainPath.setAttribute('d', dPath);
+        mainPath.setAttribute('fill', 'none');
+        mainPath.setAttribute('stroke', 'var(--sleep-line)');
+        mainPath.setAttribute('stroke-width', '2.2');
+        mainPath.setAttribute('stroke-linecap', 'round');
+        mainPath.setAttribute('stroke-linejoin', 'round');
+        svg.appendChild(mainPath);
+      }
+
+      function updateHabitFootersAndDailyBars() {
+        renderHabitFooter();
+        updateDailyProgressBars();
+      }
+
+      function updateDailyProgressBars() {
+        const monthKey = getMonthKey();
+        const record = ensureMonthRecord(monthKey);
+        const daysInMonth = getDaysInMonth(state.year, state.month);
+        const totalHabits = state.habits.length;
+
+        for (let day = 1; day <= daysInMonth; day++) {
+          const cell = document.getElementById(`dailyProg_${day}`);
+          if (!cell) continue;
+
+          if (totalHabits === 0) {
+            cell.innerHTML = '<span class="text-[10px] text-[var(--text-muted)]">—</span>';
+            continue;
+          }
+
+          let completed = 0;
+          state.habits.forEach((h) => {
+            if (record.checks[`${day}_${h.id}`]) completed++;
+          });
+          const pct = Math.round((completed / totalHabits) * 100);
+
+          cell.innerHTML = `
+            <div class="w-14 h-1.5 rounded-full bg-[var(--border-grid)] overflow-hidden">
+              <div class="h-full rounded-full transition-all duration-200 ${
+                pct === 100 ? 'bg-emerald-500' : 'bg-[var(--text-primary)]'
+              }" style="width: ${pct}%"></div>
+            </div>
+            <span class="text-[11px] text-[var(--text-muted)] w-7 text-right">${pct}%</span>
+          `;
+        }
+      }
+
+      function updateMetrics() {
+        const monthKey = getMonthKey();
+        const record = ensureMonthRecord(monthKey);
+        const daysInMonth = getDaysInMonth(state.year, state.month);
+        const totalHabits = state.habits.length;
+
+        const isCurrentMonth = (state.year === now.getFullYear() && state.month === now.getMonth());
+        const targetDay = isCurrentMonth ? now.getDate() : 1;
+        let todayChecked = 0;
+        state.habits.forEach((h) => {
+          if (record.checks[`${targetDay}_${h.id}`]) todayChecked++;
+        });
+        const todayPct = totalHabits > 0 ? Math.round((todayChecked / totalHabits) * 100) : 0;
+        document.getElementById('statTodayCount').textContent = `${todayChecked}/${totalHabits}`;
+        document.getElementById('statTodayPct').textContent = isCurrentMonth ? `${todayPct}% today` : `Day 1 (${todayPct}%)`;
+
+        let monthChecks = 0;
+        for (let d = 1; d <= daysInMonth; d++) {
+          state.habits.forEach((h) => {
+            if (record.checks[`${d}_${h.id}`]) monthChecks++;
+          });
+        }
+        const elapsedDays = isCurrentMonth ? now.getDate() : daysInMonth;
+        const denominator = Math.max(1, elapsedDays * totalHabits);
+        const adherencePct = totalHabits > 0 ? Math.min(100, Math.round((monthChecks / denominator) * 100)) : 0;
+        document.getElementById('statMonthPct').textContent = `${adherencePct}%`;
+        document.getElementById('statMonthTotalChecks').textContent = `${monthChecks} checks`;
+
+        const sleepValues = [];
+        for (let d = 1; d <= daysInMonth; d++) {
+          if (record.sleep[d] !== undefined) {
+            sleepValues.push(Number(record.sleep[d]));
+          }
+        }
+
+        if (sleepValues.length === 0) {
+          document.getElementById('statAvgSleep').textContent = '—';
+          document.getElementById('statLoggedNights').textContent = '0 nights';
+          document.getElementById('statConsistency').textContent = '—';
+          document.getElementById('statStdDev').textContent = 'Plot 2+ nights';
+          document.getElementById('footerSleepSummary').textContent = 'Avg: —';
+          document.getElementById('footerAvgReadout').textContent = '—';
+        } else {
+          const sum = sleepValues.reduce((a, b) => a + b, 0);
+          const avg = sum / sleepValues.length;
+          const avgFormatted = `${avg.toFixed(1)}h`;
+
+          document.getElementById('statAvgSleep').textContent = avgFormatted;
+          document.getElementById('statLoggedNights').textContent = `${sleepValues.length} ${sleepValues.length === 1 ? 'night' : 'nights'}`;
+          document.getElementById('footerSleepSummary').textContent = `Monthly Avg: ${avgFormatted}`;
+          document.getElementById('footerAvgReadout').textContent = avgFormatted;
+
+          if (sleepValues.length >= 2) {
+            const variance = sleepValues.reduce((acc, val) => acc + Math.pow(val - avg, 2), 0) / sleepValues.length;
+            const stdDev = Math.sqrt(variance);
+            const consistencyScore = Math.max(0, Math.min(100, Math.round(100 - stdDev * 18)));
+            document.getElementById('statConsistency').textContent = `${consistencyScore}%`;
+            document.getElementById('statStdDev').textContent = `±${stdDev.toFixed(1)}h variance`;
+          } else {
+            document.getElementById('statConsistency').textContent = '100%';
+            document.getElementById('statStdDev').textContent = '1 night logged';
+          }
+        }
+      }
+
+      // Modals
+      function openCloudModal() {
+        document.getElementById('shareCodeInput').value = generateShareCode();
+        const modal = document.getElementById('cloudModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+      function closeCloudModal() {
+        document.getElementById('cloudModal').classList.add('hidden');
+        document.getElementById('cloudModal').classList.remove('flex');
+      }
+
+      function openHabitsModal() {
+        renderModalHabitsList();
+        const modal = document.getElementById('habitsModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.getElementById('newHabitNameInput').focus();
+      }
+      function closeHabitsModal() {
+        document.getElementById('habitsModal').classList.add('hidden');
+        document.getElementById('habitsModal').classList.remove('flex');
+      }
+
+      function renderModalHabitsList() {
+        const listEl = document.getElementById('modalHabitsList');
+        listEl.innerHTML = '';
+        const count = state.habits.length;
+        const limitNotice = document.getElementById('habitLimitNotice');
+        const submitBtn = document.getElementById('submitNewHabitBtn');
+        const nameInput = document.getElementById('newHabitNameInput');
+
+        limitNotice.textContent = `${count} of ${MAX_HABITS} habit slots used.`;
+        if (count >= MAX_HABITS) {
+          submitBtn.disabled = true;
+          nameInput.disabled = true;
+          nameInput.placeholder = 'Maximum 10 habits reached';
+        } else {
+          submitBtn.disabled = false;
+          nameInput.disabled = false;
+          nameInput.placeholder = 'New habit name (e.g., Meditate 10m)...';
+        }
+
+        state.habits.forEach((habit, index) => {
+          const item = document.createElement('div');
+          item.className = 'py-2.5 flex items-center justify-between gap-2';
+          const cat = CATEGORY_COLORS[habit.category] || CATEGORY_COLORS.ink;
+
+          item.innerHTML = `
+            <div class="flex items-center gap-2.5 flex-1 min-w-0">
+              <span class="w-2.5 h-2.5 rounded-full ${cat.dot} flex-shrink-0"></span>
+              <input
+                type="text"
+                value="${escapeHtml(habit.name)}"
+                maxlength="26"
+                data-idx="${index}"
+                class="habit-rename-input text-xs font-medium bg-transparent border border-transparent hover:border-[var(--border-strong)] focus:border-blue-500 rounded px-1.5 py-1 text-[var(--text-primary)] w-full focus:outline-none"
+              />
+            </div>
+            <div class="flex items-center gap-1">
+              <button type="button" data-move-up="${index}" title="Move Left" class="p-1 rounded hover:bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-25" ${index === 0 ? 'disabled' : ''}>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+              </button>
+              <button type="button" data-move-down="${index}" title="Move Right" class="p-1 rounded hover:bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-25" ${index === state.habits.length - 1 ? 'disabled' : ''}>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+              </button>
+              <button type="button" data-delete="${index}" title="Remove Habit" class="p-1 rounded hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-500 transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
+          `;
+          listEl.appendChild(item);
+        });
+
+        listEl.querySelectorAll('.habit-rename-input').forEach((input) => {
+          input.addEventListener('change', (e) => {
+            const idx = Number(e.target.dataset.idx);
+            const val = e.target.value.trim();
+            if (val && state.habits[idx]) {
+              state.habits[idx].name = val;
+              saveHabits();
+              renderAll();
+            } else if (state.habits[idx]) {
+              e.target.value = state.habits[idx].name;
+            }
+          });
+        });
+
+        listEl.querySelectorAll('[data-move-up]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const idx = Number(btn.dataset.moveUp);
+            if (idx > 0) {
+              const temp = state.habits[idx - 1];
+              state.habits[idx - 1] = state.habits[idx];
+              state.habits[idx] = temp;
+              saveHabits();
+              renderModalHabitsList();
+              renderAll();
+            }
+          });
+        });
+
+        listEl.querySelectorAll('[data-move-down]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const idx = Number(btn.dataset.moveDown);
+            if (idx < state.habits.length - 1) {
+              const temp = state.habits[idx + 1];
+              state.habits[idx + 1] = state.habits[idx];
+              state.habits[idx] = temp;
+              saveHabits();
+              renderModalHabitsList();
+              renderAll();
+            }
+          });
+        });
+
+        listEl.querySelectorAll('[data-delete]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const idx = Number(btn.dataset.delete);
+            state.habits.splice(idx, 1);
+            saveHabits();
+            renderModalHabitsList();
+            renderAll();
+          });
+        });
+      }
+
+      function openConfirmModal(title, desc, onConfirm) {
+        document.getElementById('confirmModalTitle').textContent = title;
+        document.getElementById('confirmModalDesc').textContent = desc;
+        pendingConfirmAction = onConfirm;
+        const modal = document.getElementById('confirmModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+      function closeConfirmModal() {
+        pendingConfirmAction = null;
+        document.getElementById('confirmModal').classList.add('hidden');
+        document.getElementById('confirmModal').classList.remove('flex');
+      }
+
+      function openHelpModal() {
+        const modal = document.getElementById('helpModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+      function closeHelpModal() {
+        document.getElementById('helpModal').classList.add('hidden');
+        document.getElementById('helpModal').classList.remove('flex');
+      }
+
+      function bindEvents() {
+        document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
+
+        document.getElementById('prevMonthBtn').addEventListener('click', () => {
+          state.month--;
+          if (state.month < 0) {
+            state.month = 11;
+            state.year--;
+          }
+          renderAll();
+        });
+
+        document.getElementById('nextMonthBtn').addEventListener('click', () => {
+          state.month++;
+          if (state.month > 11) {
+            state.month = 0;
+            state.year++;
+          }
+          renderAll();
+        });
+
+        document.getElementById('jumpTodayBtn').addEventListener('click', () => {
+          const current = new Date();
+          state.year = current.getFullYear();
+          state.month = current.getMonth();
+          renderAll();
+        });
+
+        document.getElementById('toggleOptimalZone').addEventListener('change', (e) => {
+          state.settings.optimalZone = e.target.checked;
+          saveSettings();
+          document.getElementById('optimalSleepBand').style.opacity = state.settings.optimalZone ? '1' : '0';
+        });
+
+        document.getElementById('toggleSmoothCurve').addEventListener('change', (e) => {
+          state.settings.smoothCurve = e.target.checked;
+          saveSettings();
+          renderSleepSvgLine();
+        });
+
+        // Cloud Modal bindings
+        document.getElementById('openCloudModalBtn').addEventListener('click', openCloudModal);
+        document.getElementById('closeCloudModalBtn').addEventListener('click', closeCloudModal);
+        document.getElementById('doneCloudModalBtn').addEventListener('click', closeCloudModal);
+
+        document.getElementById('copyShareCodeBtn').addEventListener('click', () => {
+          const input = document.getElementById('shareCodeInput');
+          input.select();
+          document.execCommand('copy');
+          const feedback = document.getElementById('copyFeedback');
+          feedback.classList.remove('hidden');
+          setTimeout(() => feedback.classList.add('hidden'), 2000);
+        });
+
+        document.getElementById('loadImportCodeBtn').addEventListener('click', () => {
+          const code = document.getElementById('importCodeInput').value;
+          if (importShareCode(code)) {
+            closeCloudModal();
+          } else {
+            alert('Invalid share code. Please check and try again.');
+          }
+        });
+
+        document.getElementById('exportJsonBtn').addEventListener('click', () => {
+          const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+          const downloadAnchor = document.createElement('a');
+          downloadAnchor.setAttribute("href", dataStr);
+          downloadAnchor.setAttribute("download", `sanctuary_backup_${getMonthKey()}.json`);
+          document.body.appendChild(downloadAnchor);
+          downloadAnchor.click();
+          downloadAnchor.remove();
+        });
+
+        document.getElementById('importJsonFile').addEventListener('change', (e) => {
+          const fileReader = new FileReader();
+          if (e.target.files[0]) {
+            fileReader.readAsText(e.target.files[0], "UTF-8");
+            fileReader.onload = (event) => {
+              try {
+                const parsed = JSON.parse(event.target.result);
+                if (parsed && parsed.habits && parsed.records) {
+                  state.habits = parsed.habits;
+                  state.records = parsed.records;
+                  saveHabits();
+                  saveRecords();
+                  renderAll();
+                  closeCloudModal();
+                }
+              } catch (err) {
+                console.error(err);
+              }
+            };
+          }
+        });
+
+        // Habits modal
+        document.getElementById('openHabitsModalBtn').addEventListener('click', openHabitsModal);
+        document.getElementById('inlineAddHabitBtn').addEventListener('click', openHabitsModal);
+        document.getElementById('closeHabitsModalBtn').addEventListener('click', closeHabitsModal);
+        document.getElementById('doneHabitsModalBtn').addEventListener('click', closeHabitsModal);
+
+        document.getElementById('addHabitForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          if (state.habits.length >= MAX_HABITS) return;
+          const nameInput = document.getElementById('newHabitNameInput');
+          const categorySelect = document.getElementById('newHabitCategorySelect');
+          const name = nameInput.value.trim();
+          if (!name) return;
+
+          state.habits.push({
+            id: 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+            name,
+            category: categorySelect.value
+          });
+          nameInput.value = '';
+          saveHabits();
+          renderModalHabitsList();
+          renderAll();
+        });
+
+        document.getElementById('restoreDefaultHabitsBtn').addEventListener('click', () => {
+          state.habits = JSON.parse(JSON.stringify(DEFAULT_HABITS));
+          saveHabits();
+          renderModalHabitsList();
+          renderAll();
+        });
+
+        // Help modal
+        document.getElementById('openHelpModalBtn').addEventListener('click', openHelpModal);
+        document.getElementById('closeHelpModalBtn').addEventListener('click', closeHelpModal);
+        document.getElementById('doneHelpModalBtn').addEventListener('click', closeHelpModal);
+
+        document.getElementById('loadDemoBtn').addEventListener('click', () => {
+          seedSampleMonthData(state.year, state.month);
+          renderAll();
+          closeHelpModal();
+        });
+
+        // Clear month
+        document.getElementById('clearMonthBtn').addEventListener('click', () => {
+          const dateObj = new Date(state.year, state.month, 1);
+          const monthLabel = dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+          openConfirmModal(
+            `Clear ${monthLabel}?`,
+            `This will remove all checked boxes and plotted sleep points for ${monthLabel}.`,
+            () => {
+              const key = getMonthKey();
+              state.records[key] = { checks: {}, sleep: {} };
+              saveRecords();
+              renderAll();
+            }
+          );
+        });
+
+        document.getElementById('confirmCancelBtn').addEventListener('click', closeConfirmModal);
+        document.getElementById('confirmAcceptBtn').addEventListener('click', () => {
+          if (typeof pendingConfirmAction === 'function') {
+            pendingConfirmAction();
+          }
+          closeConfirmModal();
+        });
+
+        document.getElementById('cloudModal').addEventListener('click', (e) => {
+          if (e.target.id === 'cloudModal') closeCloudModal();
+        });
+        document.getElementById('habitsModal').addEventListener('click', (e) => {
+          if (e.target.id === 'habitsModal') closeHabitsModal();
+        });
+        document.getElementById('confirmModal').addEventListener('click', (e) => {
+          if (e.target.id === 'confirmModal') closeConfirmModal();
+        });
+        document.getElementById('helpModal').addEventListener('click', (e) => {
+          if (e.target.id === 'helpModal') closeHelpModal();
+        });
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      window.addEventListener('DOMContentLoaded', init);
+    })();
+  </script>
+</body>
+</html>
